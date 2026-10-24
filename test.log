@@ -1,0 +1,6 @@
+INFO Server started successfully
+WARNING Disk usage reaching limit
+ERROR Database connection failed
+INFO User login successful
+ERROR Timeout while calling API
+WARNING Memory usage high

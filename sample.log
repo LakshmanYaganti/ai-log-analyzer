@@ -1,0 +1,5 @@
+2026-03-03 10:23:45 ERROR Database connection failed
+2026-03-03 10:23:46 INFO Retrying connection
+2026-03-03 10:23:50 ERROR Timeout occurred
+2026-03-03 10:24:01 WARNING Disk space low
+2026-03-03 10:24:10 ERROR Unable to connect to authentication service

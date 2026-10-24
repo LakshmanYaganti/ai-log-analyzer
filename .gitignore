@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment / secrets — never commit a real .env
+.env
+.env.*
+!.env.example
+
+# Logs and local data
+*.log
+!sample.log
+!test.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

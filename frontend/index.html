@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Log Analyzer</title>
+
+<style>
+
+body{
+font-family: Arial, sans-serif;
+background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+text-align:center;
+padding:40px;
+margin:0;
+}
+
+h1{
+font-size:40px;
+margin-bottom:10px;
+color:#00ffd5;
+}
+
+.container{
+max-width:720px;
+margin:auto;
+background:#111;
+padding:40px;
+border-radius:10px;
+box-shadow:0 0 20px #00ffd5;
+}
+
+.upload-area{
+border:2px dashed #00ffd5;
+padding:40px;
+cursor:pointer;
+border-radius:10px;
+margin-bottom:15px;
+transition:0.3s;
+}
+
+.upload-area:hover,.upload-area.dragover{
+background:#1a1a1a;
+}
+
+button{
+padding:12px 25px;
+font-size:16px;
+border:none;
+border-radius:6px;
+background:#00ffd5;
+cursor:pointer;
+margin-top:10px;
+}
+
+button:hover{
+background:#00c7a7;
+}
+
+button:disabled{
+background:#555;
+cursor:wait;
+}
+
+#fileName{
+margin-top:10px;
+color:#00ffd5;
+font-size:14px;
+}
+
+#loading{
+margin-top:20px;
+display:none;
+}
+
+#errorBox{
+display:none;
+margin-top:20px;
+background:#3d0a0a;
+border:1px solid #ff5252;
+color:#ffb3b3;
+padding:15px;
+border-radius:8px;
+text-align:left;
+}
+
+#results{
+display:none;
+margin-top:25px;
+text-align:left;
+}
+
+.stats{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(100px,1fr));
+gap:10px;
+margin-bottom:15px;
+}
+
+.stat{
+background:#000;
+border:1px solid #00ffd5;
+border-radius:8px;
+padding:12px 6px;
+text-align:center;
+}
+
+.stat .value{
+font-size:24px;
+font-weight:bold;
+color:#00ffd5;
+}
+
+.stat .label{
+font-size:12px;
+text-transform:uppercase;
+letter-spacing:1px;
+color:#bbb;
+}
+
+.stat.error .value{color:#ff5252;}
+.stat.critical .value{color:#ff1744;}
+.stat.warning .value{color:#ffc107;}
+
+.meta{
+background:#000;
+border:1px solid #333;
+border-radius:8px;
+padding:12px 15px;
+margin-bottom:15px;
+font-size:14px;
+color:#ccc;
+}
+
+.top-error{
+background:#000;
+border:1px solid #333;
+border-left:4px solid #ff5252;
+border-radius:8px;
+padding:12px 15px;
+margin-bottom:10px;
+}
+
+.top-error .line{
+font-family:monospace;
+font-size:13px;
+word-break:break-word;
+}
+
+.top-error .count{
+display:inline-block;
+background:#00ffd5;
+color:#000;
+border-radius:10px;
+padding:0 8px;
+font-size:12px;
+font-weight:bold;
+margin-left:8px;
+}
+
+.top-error .explanation{
+margin-top:8px;
+font-size:14px;
+color:#a7f3ea;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🤖 AI Log Analyzer</h1>
+<p>Upload your logs and let AI detect issues</p>
+
+<div class="container">
+
+<div class="upload-area" id="dropArea" onclick="document.getElementById('fileInput').click()">
+📂 Click or Drop Log File Here
+</div>
+
+<p id="fileName"></p>
+
+<input type="file" id="fileInput" hidden accept=".log,.txt" onchange="showFileName()">
+
+<br>
+
+<button id="analyzeBtn" onclick="uploadFile()">Analyze Logs</button>
+
+<div id="loading">
+⏳ Analyzing logs...
+</div>
+
+<div id="errorBox"></div>
+
+<div id="results">
+  <div class="stats" id="stats"></div>
+  <div class="meta" id="meta"></div>
+  <h3 style="color:#00ffd5;">Top repeated errors</h3>
+  <div id="topErrors"></div>
+</div>
+
+</div>
+<script>
+
+const dropArea = document.getElementById("dropArea");
+const fileInput = document.getElementById("fileInput");
+
+["dragover","dragenter"].forEach(evt =>
+  dropArea.addEventListener(evt, e => { e.preventDefault(); dropArea.classList.add("dragover"); })
+);
+["dragleave","drop"].forEach(evt =>
+  dropArea.addEventListener(evt, e => { e.preventDefault(); dropArea.classList.remove("dragover"); })
+);
+dropArea.addEventListener("drop", e => {
+  const files = e.dataTransfer.files;
+  if (files.length) { fileInput.files = files; showFileName(); }
+});
+
+function showFileName(){
+  const file = fileInput.files[0];
+  if (file) {
+    document.getElementById("fileName").innerText = "Selected File: " + file.name;
+  }
+}
+
+function el(tag, className, text){
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.innerText = text;
+  return node;
+}
+
+function showError(message){
+  const box = document.getElementById("errorBox");
+  box.innerText = message;
+  box.style.display = "block";
+}
+
+function renderResults(data){
+  const stats = document.getElementById("stats");
+  stats.innerHTML = "";
+  const cards = [
+    ["Total lines", data.total_lines, ""],
+    ["Info", data.severity.INFO, ""],
+    ["Warning", data.severity.WARNING, "warning"],
+    ["Error", data.severity.ERROR, "error"],
+    ["Critical", data.severity.CRITICAL, "critical"],
+    ["Error rate", data.error_rate + "%", data.error_rate > 0 ? "error" : ""],
+  ];
+  for (const [label, value, cls] of cards) {
+    const card = el("div", "stat " + cls);
+    card.appendChild(el("div", "value", String(value)));
+    card.appendChild(el("div", "label", label));
+    stats.appendChild(card);
+  }
+
+  document.getElementById("meta").innerText =
+    "First log: " + (data.first_timestamp || "Unknown") +
+    "   •   Last log: " + (data.last_timestamp || "Unknown");
+
+  const list = document.getElementById("topErrors");
+  list.innerHTML = "";
+  if (!data.top_errors.length) {
+    list.appendChild(el("p", "", "No errors found 🎉"));
+  }
+  for (const item of data.top_errors) {
+    const box = el("div", "top-error");
+    const line = el("div", "line", item.error);
+    const badge = el("span", "count", "× " + item.count);
+    line.appendChild(badge);
+    box.appendChild(line);
+    box.appendChild(el("div", "explanation", "💡 " + item.explanation));
+    list.appendChild(box);
+  }
+
+  document.getElementById("results").style.display = "block";
+}
+
+async function uploadFile(){
+  if (!fileInput.files.length) {
+    alert("Please upload a log file first");
+    return;
+  }
+
+  const btn = document.getElementById("analyzeBtn");
+  const errorBox = document.getElementById("errorBox");
+  errorBox.style.display = "none";
+  document.getElementById("results").style.display = "none";
+  document.getElementById("loading").style.display = "block";
+  btn.disabled = true;
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  try {
+    const response = await fetch("http://localhost:8000/analyze", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      showError("Analysis failed: " + ((data && data.detail) || ("HTTP " + response.status)));
+      return;
+    }
+    renderResults(data);
+  } catch (error) {
+    showError("Server connection error. Is the backend running at http://localhost:8000?");
+  } finally {
+    document.getElementById("loading").style.display = "none";
+    btn.disabled = false;
+  }
+}
+
+</script>
+
+</body>
+</html>
